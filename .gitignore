@@ -16,9 +16,10 @@ venv/
 env/
 .env/
 
-# PyInstaller
-*.spec
+# PyInstaller (allow our own spec, ignore generated ones)
 *.manifest
+*.spec
+!GitHubAppManager.spec
 
 # IDE / OS
 .vscode/
@@ -37,6 +38,8 @@ config_local.py
 
 # App data written at runtime
 app_registry.json
+registry.json
+_build/
 
 # Build output
 GitHubAppManager_EXE/
