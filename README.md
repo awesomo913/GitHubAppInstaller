@@ -29,9 +29,9 @@ Works on **Windows** and **Raspberry Pi / Linux**.
 
 ### Pre-built .exe (ZIP)
 
-Each push to `main` builds **`GitHubAppManager_Windows.zip`** in [GitHub Actions](https://github.com/awesomo913/GitHubAppManager/actions). Open the latest successful **Build Windows exe** run, then **Artifacts** → download **GitHubAppManager_Windows**; the ZIP contains **`GitHubAppManager.exe`**.
+Each push to `main` builds **`GitHubAppManager_Windows.zip`** in [GitHub Actions](https://github.com/awesomo913/GitHubAppInstaller/actions). Open the latest successful **Build Windows exe** run, then **Artifacts** → download **GitHubAppManager_Windows**; the ZIP contains **`GitHubAppManager.exe`**.
 
-Tags named **`v*`** (for example `v3.2.0`) attach the same ZIP to a [GitHub Release](https://github.com/awesomo913/GitHubAppManager/releases).
+Tags named **`v*`** (for example `v3.2.0`) attach the same ZIP to a [GitHub Release](https://github.com/awesomo913/GitHubAppInstaller/releases).
 
 ### Raspberry Pi / Linux
 

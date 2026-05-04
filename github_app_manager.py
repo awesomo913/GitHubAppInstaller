@@ -1698,7 +1698,7 @@ class App(tk.Tk):
         def _build():
             if getattr(sys, "frozen", False):
                 _w("Cannot rebuild from GitHubAppManager.exe — no Python source is bundled.")
-                _w("Clone https://github.com/awesomo913/GitHubAppManager and run build_exe.bat,")
+                _w("Clone https://github.com/awesomo913/GitHubAppInstaller and run build_exe.bat,")
                 _w("or run:  py -3 github_app_manager.py  from that folder.")
                 st.configure(text="Use build_exe.bat from a git checkout.", fg=C["yellow"])
                 return

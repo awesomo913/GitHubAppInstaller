@@ -18,7 +18,7 @@ if errorlevel 1 (
 
 REM ── Get repo URL from user ─────────────────────────────────────
 echo  Enter your GitHub repository URL.
-echo  Example: https://github.com/awesomo913/GitHubAppManager
+echo  Example: https://github.com/awesomo913/GitHubAppInstaller
 echo  (Create the repo on GitHub first — keep it empty, no README)
 echo.
 set /p REMOTE_URL=  Repo URL: 
