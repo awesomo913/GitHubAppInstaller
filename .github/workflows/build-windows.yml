@@ -1,0 +1,72 @@
+# Builds GitHubAppManager.exe on Windows and uploads a ZIP containing the exe.
+name: Build Windows exe
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyinstaller requests pywin32 keyring
+
+      - name: PyInstaller
+        shell: pwsh
+        run: |
+          $ico = Join-Path $PWD "icons/github_app_manager.ico"
+          $cmd = @(
+            "python", "-m", "PyInstaller",
+            "--onefile", "--windowed", "--clean",
+            "--name", "GitHubAppManager",
+            "--distpath", "dist",
+            "--workpath", "build/pyi-work",
+            "--specpath", "build",
+            "--collect-submodules", "keyring",
+            "--hidden-import", "gab",
+            "--hidden-import", "gab.credentials",
+            "--hidden-import", "gab.git_clone",
+            "--hidden-import", "gab.zip_safe"
+          )
+          if (Test-Path $ico) {
+            $cmd += "--icon=$ico"
+            $cmd += "--add-data"
+            $cmd += "${ico};icons"
+          }
+          $cmd += "github_app_manager.py"
+          & $cmd[0] @($cmd[1..($cmd.Length - 1)])
+
+      - name: Create ZIP (exe inside)
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD "dist/GitHubAppManager.exe"
+          if (-not (Test-Path $exe)) { throw "Build failed: dist/GitHubAppManager.exe missing" }
+          $zip = Join-Path $PWD "GitHubAppManager_Windows.zip"
+          Compress-Archive -LiteralPath $exe -DestinationPath $zip -Force
+          Get-Item $zip | Format-List Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GitHubAppManager_Windows
+          path: GitHubAppManager_Windows.zip
+
+      - name: Attach ZIP to GitHub Release (tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: GitHubAppManager_Windows.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

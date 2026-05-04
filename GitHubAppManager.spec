@@ -1,18 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for GitHub App Manager v4.0
-# Usage:  pyinstaller GitHubAppManager.spec
-#         (or click "Build .exe" inside the app)
+# PyInstaller spec — GitHub App Manager
+# Usage: pyinstaller GitHubAppManager.spec   (from repo root)
 
-import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+ICO = ROOT / "icons" / "github_app_manager.ico"
+ico_arg = str(ICO) if ICO.is_file() else None
+bundle_datas = [(str(ICO), "icons")] if ICO.is_file() else []
 
 block_cipher = None
 
 a = Analysis(
     ["github_app_manager.py"],
-    pathex=[str(Path(".").resolve())],
+    pathex=[str(ROOT)],
     binaries=[],
-    datas=[],
+    datas=bundle_datas,
     hiddenimports=[
         "requests",
         "urllib3",
@@ -27,6 +30,11 @@ a = Analysis(
         "win32com.client",
         "win32com",
         "pywintypes",
+        "gab",
+        "gab.credentials",
+        "gab.git_clone",
+        "gab.zip_safe",
+        "keyring",
     ],
     hookspath=[],
     hooksconfig={},
@@ -38,10 +46,10 @@ a = Analysis(
     noarchive=False,
 )
 
-# Pull in all of requests' data (charset_normalizer codec files etc.)
 from PyInstaller.utils.hooks import collect_all
+
 datas_r, binaries_r, hiddenimports_r = collect_all("requests")
-a.datas    += datas_r
+a.datas += datas_r
 a.binaries += binaries_r
 a.hiddenimports += hiddenimports_r
 
@@ -61,11 +69,11 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,          # windowless on Windows
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon=ico_arg,
 )

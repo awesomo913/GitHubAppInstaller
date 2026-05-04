@@ -41,5 +41,5 @@ app_registry.json
 registry.json
 _build/
 
-# Build output
+# Build output (legacy Desktop folder — safe to delete manually)
 GitHubAppManager_EXE/
