@@ -1,13 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec — GitHub App Manager
 # Usage: pyinstaller GitHubAppManager.spec   (from repo root)
+# SPECPATH is injected by PyInstaller at eval-time — do not use __file__
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-ICO = ROOT / "icons" / "github_app_manager.ico"
-ico_arg = str(ICO) if ICO.is_file() else None
-bundle_datas = [(str(ICO), "icons")] if ICO.is_file() else []
+ROOT = Path(SPECPATH).resolve()
+ICO  = ROOT / "icons" / "github_app_manager.ico"
+ico_arg    = str(ICO) if ICO.is_file() else None
+icon_datas = [(str(ICO), "icons")] if ICO.is_file() else []
 
 block_cipher = None
 
@@ -15,14 +16,13 @@ a = Analysis(
     ["github_app_manager.py"],
     pathex=[str(ROOT)],
     binaries=[],
-    datas=bundle_datas,
+    datas=icon_datas,
     hiddenimports=[
         "requests",
         "urllib3",
         "urllib3.util.retry",
         "certifi",
         "charset_normalizer",
-        "charset_normalizer.md__mypyc",
         "idna",
         "tkinter",
         "tkinter.ttk",
@@ -30,14 +30,16 @@ a = Analysis(
         "win32com.client",
         "win32com",
         "pywintypes",
+        "keyring",
+        "keyring.backends",
+        "keyring.backends.Windows",
         "gab",
         "gab.credentials",
         "gab.git_clone",
         "gab.zip_safe",
-        "keyring",
     ],
     hookspath=[],
-    hooksconfig={},
+    hooksconfig={"requests": {"collect-all": True}},
     runtime_hooks=[],
     excludes=["matplotlib", "numpy", "pandas", "PIL", "scipy", "test"],
     win_no_prefer_redirects=False,
@@ -45,13 +47,6 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
-
-from PyInstaller.utils.hooks import collect_all
-
-datas_r, binaries_r, hiddenimports_r = collect_all("requests")
-a.datas += datas_r
-a.binaries += binaries_r
-a.hiddenimports += hiddenimports_r
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
