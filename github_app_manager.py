@@ -16,11 +16,13 @@ from gab import (
     extract_zip_safely,
     git_clone_args,
     git_env_no_prompt,
+    git_fetch_origin_depth_args,
+    git_merge_ff_fetch_head_args,
     git_pull_args,
 )
 
 APP_NAME = "GitHub App Manager"
-VER      = "3.2"
+VER      = "3.3"
 
 # ── Platform detection ─────────────────────────────────────────────────────────
 IS_WIN  = sys.platform == "win32"
@@ -231,6 +233,11 @@ IS_FROZEN = getattr(sys, "frozen", False)
 
 def _win_hide_console_kw() -> dict:
     return {"creationflags": subprocess.CREATE_NO_WINDOW} if IS_WIN else {}
+
+
+def _subprocess_text_kw() -> dict:
+    """Hide console flashes on Windows + decode git/pip stderr as UTF-8."""
+    return {**_win_hide_console_kw(), "encoding": "utf-8", "errors": "replace"}
 
 
 def host_python_for_venv() -> Optional[str]:
@@ -606,21 +613,84 @@ class Installer:
                 return self._download_repo_zip(owner, repo, d, aid)
             else:
                 self.log("  Pulling latest changes...")
-                r = subprocess.run(
-                    git_pull_args(str(d), self.api.token),
+                kw = dict(
                     env=git_env_no_prompt(),
                     capture_output=True,
                     text=True,
+                    **_subprocess_text_kw(),
                 )
-                self.log(f"  {r.stdout.strip() or 'Already up to date.'}")
-                if atype=="python":
-                    pip=d/".venv"/VENV_BIN/VENV_PIP; req=d/"requirements.txt"
+                r = subprocess.run(git_pull_args(str(d), self.api.token), **kw)
+                out_msg = (r.stdout or "").strip()
+                err_msg = (r.stderr or "").strip()
+                if r.returncode != 0:
+                    self.log("  ⚠ git pull failed — retrying shallow fetch + merge…")
+                    fetch = subprocess.run(
+                        git_fetch_origin_depth_args(str(d), self.api.token),
+                        **kw,
+                    )
+                    if fetch.returncode == 0:
+                        r = subprocess.run(
+                            git_merge_ff_fetch_head_args(str(d), self.api.token),
+                            **kw,
+                        )
+                        out_msg = (r.stdout or "").strip()
+                        err_msg = (r.stderr or "").strip()
+                if r.returncode != 0:
+                    combo = "\n".join(
+                        x for x in (out_msg, err_msg) if x
+                    ).strip() or "(no output)"
+                    self.log(f"  ✗ git pull failed:\n{combo[:900]}")
+                    self.log(
+                        "  ℹ Tip: open the install folder, run `git status`. "
+                        "If you have local commits, pull/rebase manually, then Update again."
+                    )
+                    return False
+                self.log(f"  {out_msg or 'Already up to date.'}")
+                if err_msg and "already up to date" not in err_msg.lower():
+                    self.log(f"  {err_msg[:500]}")
+                if atype == "python":
+                    pip = d / ".venv" / VENV_BIN / VENV_PIP
+                    req = d / "requirements.txt"
                     if req.exists() and pip.exists():
                         self.log("  Updating requirements...")
-                        subprocess.run([str(pip),"install","-r",str(req),"-q"],capture_output=True)
-                ver=self._hash(d)
-                self.registry.update(aid,{"version":ver,"updated_at":_now()})
-                self.log(f"  ✓ Updated to {ver}"); return True
+                        subprocess.run(
+                            [str(pip), "install", "-r", str(req), "-q"],
+                            capture_output=True,
+                            **_subprocess_text_kw(),
+                        )
+                    if pip.exists() and (
+                        (d / "setup.py").exists() or (d / "pyproject.toml").exists()
+                    ):
+                        self.log("  Refreshing editable install…")
+                        subprocess.run(
+                            [str(pip), "install", "-e", ".", "-q"],
+                            cwd=str(d),
+                            capture_output=True,
+                            **_subprocess_text_kw(),
+                        )
+                elif atype == "nodejs":
+                    self.log("  Refreshing npm dependencies…")
+                    try:
+                        rnpm = subprocess.run(
+                            npm_argv(["install", "--silent"]),
+                            cwd=str(d),
+                            capture_output=True,
+                            text=True,
+                            **_subprocess_text_kw(),
+                        )
+                        if rnpm.returncode != 0:
+                            body = (rnpm.stderr or rnpm.stdout or "")[:600]
+                            self.log(f"  ✗ npm install failed:\n{body}")
+                            return False
+                    except FileNotFoundError as e:
+                        self.log(f"  ✗ npm not found: {e}")
+                        return False
+                ver = self._hash(d)
+                self.registry.update(
+                    aid, {"version": ver, "updated_at": _now()}
+                )
+                self.log(f"  ✓ Updated to {ver}")
+                return True
         except Exception: self.log(f"  ✗ {traceback.format_exc()}")
         return False
 
@@ -777,6 +847,7 @@ class Installer:
                 env=git_env_no_prompt(),
                 capture_output=True,
                 text=True,
+                **_subprocess_text_kw(),
             )
             if r.returncode!=0:
                 self.log(f"  ✗ Clone failed:\n{r.stderr[:500]}")
@@ -816,24 +887,24 @@ class Installer:
             self.log(f"  Using system Python for venv: {hp}")
         venv_args=[hp,"-m","venv",str(venv)]
         if IS_PI: venv_args.append("--system-site-packages")
-        r=subprocess.run(venv_args,capture_output=True,text=True,**_win_hide_console_kw())
+        r=subprocess.run(venv_args,capture_output=True,text=True,**_subprocess_text_kw())
         if r.returncode!=0:
             self.log(f"  ✗ venv failed:\n{r.stderr[:200]}"); return False
 
         pip=str(d/".venv"/VENV_BIN/VENV_PIP)
         py =str(d/".venv"/VENV_BIN/VENV_PY)
 
-        subprocess.run([pip,"install","--upgrade","pip","-q"],capture_output=True)
+        subprocess.run([pip,"install","--upgrade","pip","-q"],capture_output=True, **_subprocess_text_kw())
 
         req=d/"requirements.txt"
         if req.exists():
             self.log("  Installing requirements.txt...")
-            r=subprocess.run([pip,"install","-r",str(req),"-q"],capture_output=True,text=True)
+            r=subprocess.run([pip,"install","-r",str(req),"-q"],capture_output=True,text=True, **_subprocess_text_kw())
             if r.returncode!=0: self.log(f"  ⚠ Some deps failed:\n{r.stderr[:300]}")
 
         if (d/"setup.py").exists() or (d/"pyproject.toml").exists():
             self.log("  Installing package (pip install -e .)...")
-            subprocess.run([pip,"install","-e",".","-q"],cwd=str(d),capture_output=True)
+            subprocess.run([pip,"install","-e",".","-q"],cwd=str(d),capture_output=True, **_subprocess_text_kw())
 
         entry=self._entry(d)
         if not entry:
@@ -875,6 +946,7 @@ class Installer:
                 env=git_env_no_prompt(),
                 capture_output=True,
                 text=True,
+                **_subprocess_text_kw(),
             )
             if r.returncode != 0:
                 self.log(f"  ✗ Clone failed:\n{r.stderr[:300]}")
@@ -886,7 +958,7 @@ class Installer:
                 cwd=str(d),
                 capture_output=True,
                 text=True,
-                **_win_hide_console_kw(),
+                **_subprocess_text_kw(),
             )
             if r.returncode != 0:
                 self.log(f"  ✗ npm install failed:\n{(r.stderr or r.stdout or '')[:600]}")
@@ -926,6 +998,7 @@ class Installer:
             env=git_env_no_prompt(),
             capture_output=True,
             text=True,
+            **_subprocess_text_kw(),
         )
         if r.returncode!=0:
             self.log(f"  ✗ Clone failed:\n{r.stderr[:400]}")
@@ -1085,7 +1158,7 @@ class Installer:
             return sh
 
     def _hash(self, d):
-        r=subprocess.run(["git","-C",str(d),"rev-parse","--short","HEAD"],capture_output=True,text=True)
+        r=subprocess.run(["git","-C",str(d),"rev-parse","--short","HEAD"],capture_output=True,text=True, **_subprocess_text_kw())
         return r.stdout.strip() if r.returncode==0 else "unknown"
 
 # ── UI widgets ─────────────────────────────────────────────────────────────────
@@ -1698,7 +1771,7 @@ class App(tk.Tk):
         def _build():
             if getattr(sys, "frozen", False):
                 _w("Cannot rebuild from GitHubAppManager.exe — no Python source is bundled.")
-                _w("Clone https://github.com/awesomo913/GitHubAppInstaller and run build_exe.bat,")
+                _w("Clone https://github.com/awesomo913/GitHubAppManager and run build_exe.bat,")
                 _w("or run:  py -3 github_app_manager.py  from that folder.")
                 st.configure(text="Use build_exe.bat from a git checkout.", fg=C["yellow"])
                 return

@@ -5,6 +5,8 @@ from gab.git_clone import (
     git_auth_prefix_args,
     git_clone_args,
     git_env_no_prompt,
+    git_fetch_origin_depth_args,
+    git_merge_ff_fetch_head_args,
     git_pull_args,
     github_auth_header_value,
 )
@@ -16,6 +18,8 @@ __all__ = [
     "git_auth_prefix_args",
     "git_clone_args",
     "git_env_no_prompt",
+    "git_fetch_origin_depth_args",
+    "git_merge_ff_fetch_head_args",
     "git_pull_args",
     "github_auth_header_value",
     "TokenStore",

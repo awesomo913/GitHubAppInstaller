@@ -32,7 +32,21 @@ def git_clone_args(owner: str, repo: str, dest: str, token: Optional[str]) -> Li
 
 
 def git_pull_args(repo_dir: str, token: Optional[str]) -> List[str]:
-    return _git_with_github_auth(token, "-C", repo_dir, "pull")
+    """Fast-forward pull (common case). On failure, caller may retry fetch+merge."""
+    return _git_with_github_auth(token, "-C", repo_dir, "pull", "--ff-only")
+
+
+def git_fetch_origin_depth_args(repo_dir: str, token: Optional[str]) -> List[str]:
+    """Shallow fetch latest tip — helps some edge cases after ``clone --depth=1``."""
+    return _git_with_github_auth(
+        token, "-C", repo_dir, "fetch", "--depth=1", "origin"
+    )
+
+
+def git_merge_ff_fetch_head_args(repo_dir: str, token: Optional[str]) -> List[str]:
+    return _git_with_github_auth(
+        token, "-C", repo_dir, "merge", "--ff-only", "FETCH_HEAD"
+    )
 
 
 def git_env_no_prompt() -> dict:
