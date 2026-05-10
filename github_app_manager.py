@@ -22,7 +22,7 @@ from gab import (
 )
 
 APP_NAME = "GitHub App Manager"
-VER      = "3.3"
+VER      = "3.3.1"
 
 # ── Platform detection ─────────────────────────────────────────────────────────
 IS_WIN  = sys.platform == "win32"
@@ -889,7 +889,31 @@ class Installer:
         if IS_PI: venv_args.append("--system-site-packages")
         r=subprocess.run(venv_args,capture_output=True,text=True,**_subprocess_text_kw())
         if r.returncode!=0:
-            self.log(f"  ✗ venv failed:\n{r.stderr[:200]}"); return False
+            err_tail = (r.stderr or r.stdout or "").strip()
+            self.log(f"  ✗ venv failed:\n{err_tail[:500]}")
+            self.log(
+                "  ⚠ Keeping the cloned repo and registering it as a folder install.\n"
+                "     Fix Python (see Settings / PATH), delete .venv if partly created, then ↑ Update or reinstall."
+            )
+            sc = make_shortcut(repo, d)
+            ver = self._hash(d)
+            self.registry.add(
+                aid,
+                {
+                    "name": repo,
+                    "owner": owner,
+                    "repo": repo,
+                    "type": "clone",
+                    "version": ver,
+                    "install_dir": str(d),
+                    "exe_path": str(d),
+                    "shortcut_path": str(sc),
+                    "installed_at": _now(),
+                    "updated_at": _now(),
+                },
+            )
+            self.log(f"  ✓ Registered — shortcut opens folder: {d}")
+            return True
 
         pip=str(d/".venv"/VENV_BIN/VENV_PIP)
         py =str(d/".venv"/VENV_BIN/VENV_PY)
@@ -1566,8 +1590,13 @@ class App(tk.Tk):
         app=self.registry.apps.get(aid,{}); exe=Path(app.get("exe_path",""))
         if not exe.exists(): messagebox.showerror(APP_NAME,f"Cannot find:\n{exe}\n\nTry reinstalling."); return
         try:
-            if IS_WIN: subprocess.Popen([str(exe)],cwd=str(exe.parent if exe.is_file() else exe))
-            else:      subprocess.Popen(["bash" if exe.suffix==".sh" else "xdg-open",str(exe)])
+            if IS_WIN:
+                if exe.is_dir():
+                    open_folder(exe)
+                else:
+                    subprocess.Popen([str(exe)], cwd=str(exe.parent))
+            else:
+                subprocess.Popen(["bash" if exe.suffix==".sh" else "xdg-open", str(exe)])
             self._log(f"▶ Launched {app['name']}")
         except Exception as e: messagebox.showerror(APP_NAME,f"Launch error:\n{e}")
 
